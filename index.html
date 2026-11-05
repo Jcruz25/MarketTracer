@@ -52,7 +52,12 @@
     const { useState, useEffect, useRef } = React;
 
     const PORTFOLIO_URL = "https://jcruz25.github.io/Technical-Portfolio/";
-    const GITHUB_RELEASES_URL = "https://github.com/jcruz25/market-tracer/releases";
+    const GITHUB_RELEASES_URL = "https://github.com/jcruz25/MarketTracer/releases";
+
+    // Detección automática de entorno (Local vs Nube)
+    const API_BASE = window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost" || window.location.protocol === "file:"
+      ? "http://127.0.0.1:8000" 
+      : "https://markettracer.onrender.com";
 
     const translations = {
       es: {
@@ -307,10 +312,10 @@
 
       const fetchMarketData = async (tab, isBackground = false) => {
         try {
-          // Apuntando de vuelta al servidor local en Python
+          // Utiliza API_BASE para alternar dinámicamente entre local y nube
           const [resCryptos, resStocks] = await Promise.all([
-            fetch('http://127.0.0.1:8000/api/rankings/cryptos').then(r => r.json()).catch(() => []),
-            fetch('http://127.0.0.1:8000/api/rankings/stocks').then(r => r.json()).catch(() => [])
+            fetch(`${API_BASE}/api/rankings/cryptos`).then(r => r.json()).catch(() => []),
+            fetch(`${API_BASE}/api/rankings/stocks`).then(r => r.json()).catch(() => [])
           ]);
           const allCombined = [...(Array.isArray(resCryptos) ? resCryptos : []), ...(Array.isArray(resStocks) ? resStocks : [])];
 
