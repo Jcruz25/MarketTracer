@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Market Tracer - Pro Terminal</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- React & ReactDOM -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <!-- Babel -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            darkBg: '#181a20',
+            panelBg: '#0b0e11',
+            cardBg: '#1e2329',
+            accentGreen: '#0ecb81',
+            accentRed: '#f6465d',
+            borderDark: '#2b313a'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    .tour-overlay {
+      position: fixed;
+      inset: 0;
+      background-color: rgba(0, 0, 0, 0.82);
+      z-index: 50;
+      pointer-events: auto;
+    }
+    .tour-highlight {
+      position: relative !important;
+      z-index: 60 !important;
+      box-shadow: 0 0 0 3px #06b6d4, 0 0 25px rgba(6, 182, 212, 0.6) !important;
+      border-radius: 8px;
+      transition: all 0.3s ease-in-out;
+    }
+  </style>
+</head>
+<body class="bg-darkBg text-slate-100 font-sans antialiased overflow-hidden select-none">
+  <div id="root" class="w-screen h-screen"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    const PORTFOLIO_URL = "https://jcruz25.github.io/Technical-Portfolio/";
+    const GITHUB_RELEASES_URL = "https://github.com/jcruz25/market-tracer/releases";
+
+    const translations = {
+      es: {
+        spotMarkets: "Mercados Spot",
+        stocks: "Acciones Tradicionales",
+        favorites: "⭐ Favoritos",
+        online: "En Línea",
+        sync: "Sync",
+        orderBook: "Libro de Órdenes",
+        priceUsdt: "Precio (USDT)",
+        paperTrading: "🎮 Paper Trading",
+        simulator: "Simulador",
+        buy500: "Comprar $500",
+        buy1000: "Comprar $1,000",
+        openPositions: "Posiciones Abiertas",
+        noOpenPositions: "No hay operaciones abiertas",
+        close: "Cerrar",
+        entry: "Entrada",
+        current: "Actual",
+        change24h: "Variación 24h",
+        techScore: "Score Técnico",
+        rsi: "RSI (14 Periodos)",
+        selectAsset: "Selecciona un activo para ver el análisis",
+        noFavorites: "Tu lista de favoritos está vacía. Marca con ⭐ tus activos preferidos.",
+        technicalRanking: "Ranking Técnico",
+        closedHistory: "Historial Cerrado",
+        noClosedTrades: "Sin operaciones cerradas",
+        soundOn: "🔔 Sonido ON",
+        soundOff: "🔕 Sonido OFF",
+        strongBuy: "🟢 COMPRA FUERTE",
+        moderateBuy: "🟢 COMPRA MODERADA",
+        hold: "🟡 MANTENER",
+        avoid: "🔴 EVITAR / VENTA",
+        scanning: "Escaneando mercado en vivo...",
+        selectToTrade: "Selecciona un activo para operar",
+        virtualBalance: "Saldo Virtual:",
+        downloadApp: "📥 Descargar App",
+        developedBy: "Desarrollado por",
+        tourNext: "Siguiente ➔",
+        tourPrev: "← Anterior",
+        tourFinish: "¡Entendido!",
+        tourSteps: [
+          {
+            title: "1. Selector de Mercados y Favoritos",
+            desc: "Usa este menú superior para alternar entre Criptomonedas de Binance, Acciones Tradicionales del Nasdaq y tu lista de Favoritos.",
+            position: "top-16 left-1/2 -translate-x-1/2"
+          },
+          {
+            title: "2. Gráficos de Velas e Indicadores",
+            desc: "Visualiza la gráfica de velas japonesas de TradingView junto a las señales automáticas de Compra/Venta y el RSI (14).",
+            position: "top-1/3 left-1/2 -translate-x-1/2"
+          },
+          {
+            title: "3. Simulador de Paper Trading",
+            desc: "Ejecuta órdenes virtuales sin riesgo usando tu saldo de $10,000 USDT en este panel lateral.",
+            position: "top-1/3 left-80"
+          },
+          {
+            title: "4. Ranking Técnico de Oportunidades",
+            desc: "Monitorea los activos con mejor score técnico del mercado en tiempo real y marca tus preferidos con ⭐.",
+            position: "top-1/3 right-88"
+          }
+        ]
+      },
+      en: {
+        spotMarkets: "Spot Markets",
+        stocks: "Traditional Stocks",
+        favorites: "⭐ Watchlist",
+        online: "Online",
+        sync: "Sync",
+        orderBook: "Order Book",
+        priceUsdt: "Price (USDT)",
+        paperTrading: "🎮 Paper Trading",
+        simulator: "Simulator",
+        buy500: "Buy $500",
+        buy1000: "Buy $1,000",
+        openPositions: "Open Positions",
+        noOpenPositions: "No open trades",
+        close: "Close",
+        entry: "Entry",
+        current: "Current",
+        change24h: "24h Change",
+        techScore: "Tech Score",
+        rsi: "RSI (14 Periods)",
+        selectAsset: "Select an asset to view analysis",
+        noFavorites: "Your watchlist is empty. Click ⭐ on any asset to add it.",
+        technicalRanking: "Technical Ranking",
+        closedHistory: "Closed History",
+        noClosedTrades: "No closed trades",
+        soundOn: "🔔 Sound ON",
+        soundOff: "🔕 Sound OFF",
+        strongBuy: "🟢 STRONG BUY",
+        moderateBuy: "🟢 MODERATE BUY",
+        hold: "🟡 HOLD",
+        avoid: "🔴 AVOID / SELL",
+        scanning: "Scanning live market...",
+        selectToTrade: "Select an asset to trade",
+        virtualBalance: "Virtual Balance:",
+        downloadApp: "📥 Download App",
+        developedBy: "Developed by",
+        tourNext: "Next ➔",
+        tourPrev: "← Back",
+        tourFinish: "Got it!",
+        tourSteps: [
+          {
+            title: "1. Market Selector & Watchlist",
+            desc: "Use this top navigation menu to switch between Binance Cryptos, Nasdaq Stocks, and your personal Watchlist.",
+            position: "top-16 left-1/2 -translate-x-1/2"
+          },
+          {
+            title: "2. Candlestick Chart & Technical Indicators",
+            desc: "View real TradingView candlesticks along with automated Buy/Sell signals and RSI (14).",
+            position: "top-1/3 left-1/2 -translate-x-1/2"
+          },
+          {
+            title: "3. Paper Trading Simulator",
+            desc: "Execute risk-free virtual orders using your $10,000 USDT balance in this side panel.",
+            position: "top-1/3 left-80"
+          },
+          {
+            title: "4. Technical Opportunity Ranking",
+            desc: "Scan real-time assets with top momentum scores and click ⭐ to add them to your watchlist.",
+            position: "top-1/3 right-88"
+          }
+        ]
+      }
+    };
+
+    function App() {
+      const [lang, setLang] = useState('es');
+      const t = translations[lang];
+
+      const [activeTab, setActiveTab] = useState('cryptos');
+      const [assets, setAssets] = useState([]);
+      const [selectedAsset, setSelectedAsset] = useState(null);
+      const [initialLoading, setInitialLoading] = useState(true);
+      const [lastUpdate, setLastUpdate] = useState('--:--:--');
+      
+      const [alerts, setAlerts] = useState([]);
+      const [soundEnabled, setSoundEnabled] = useState(true);
+      const notifiedSymbolsRef = useRef(new Set());
+
+      const [tourStep, setTourStep] = useState(null);
+
+      const [paperBalance, setPaperBalance] = useState(() => {
+        const saved = localStorage.getItem('paper_balance');
+        return saved ? parseFloat(saved) : 10000.0;
+      });
+
+      const [openPositions, setOpenPositions] = useState(() => {
+        try {
+          return JSON.parse(localStorage.getItem('paper_positions') || '[]');
+        } catch {
+          return [];
+        }
+      });
+
+      const [tradeHistory, setTradeHistory] = useState(() => {
+        try {
+          return JSON.parse(localStorage.getItem('paper_history') || '[]');
+        } catch {
+          return [];
+        }
+      });
+
+      const [favorites, setFavorites] = useState(() => {
+        try {
+          return JSON.parse(localStorage.getItem('market_favorites') || '[]');
+        } catch {
+          return [];
+        }
+      });
+
+      const selectedSymbolRef = useRef(null);
+
+      useEffect(() => {
+        selectedSymbolRef.current = selectedAsset ? selectedAsset.symbol : null;
+      }, [selectedAsset]);
+
+      useEffect(() => {
+        localStorage.setItem('paper_balance', paperBalance.toString());
+        localStorage.setItem('paper_positions', JSON.stringify(openPositions));
+        localStorage.setItem('paper_history', JSON.stringify(tradeHistory));
+      }, [paperBalance, openPositions, tradeHistory]);
+
+      useEffect(() => {
+        const hasSeenTour = localStorage.getItem('has_seen_tour');
+        if (!hasSeenTour) {
+          setTimeout(() => setTourStep(0), 1000);
+        }
+      }, []);
+
+      const finishTour = () => {
+        setTourStep(null);
+        localStorage.setItem('has_seen_tour', 'true');
+      };
+
+      const playAlertSound = (type) => {
+        if (!soundEnabled) return;
+        try {
+          const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(type === 'bullish' ? 880 : 440, audioCtx.currentTime);
+          gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.3);
+        } catch (e) {}
+      };
+
+      const checkAndTriggerAlerts = (data) => {
+        if (!Array.isArray(data)) return;
+        data.forEach(item => {
+          if (!favorites.includes(item.symbol)) return;
+
+          const keyBull = `${item.symbol}_bull`;
+          const keyBear = `${item.symbol}_bear`;
+
+          if (item.score >= 80 && !notifiedSymbolsRef.current.has(keyBull)) {
+            notifiedSymbolsRef.current.add(keyBull);
+            playAlertSound('bullish');
+            addToastAlert({
+              id: Date.now() + Math.random(),
+              type: 'bullish',
+              title: lang === 'es' ? `⭐ [FAVORITO] 🚀 OPORTUNIDAD ALCISTA` : `⭐ [WATCHLIST] 🚀 BULLISH`,
+              message: `${item.symbol} alcanzó un Score de ${item.score} (RSI: ${item.rsi})`
+            });
+          }
+          if (item.score <= 30 && !notifiedSymbolsRef.current.has(keyBear)) {
+            notifiedSymbolsRef.current.add(keyBear);
+            playAlertSound('bearish');
+            addToastAlert({
+              id: Date.now() + Math.random(),
+              type: 'bearish',
+              title: lang === 'es' ? `⭐ [FAVORITO] ⚠️ ALERTA DE VENTA` : `⭐ [WATCHLIST] ⚠️ SELL ALERT`,
+              message: `${item.symbol} cayó a un Score de ${item.score} (RSI: ${item.rsi})`
+            });
+          }
+        });
+      };
+
+      const addToastAlert = (newAlert) => {
+        setAlerts(prev => [newAlert, ...prev.slice(0, 3)]);
+        setTimeout(() => {
+          setAlerts(prev => prev.filter(a => a.id !== newAlert.id));
+        }, 5000);
+      };
+
+      const fetchMarketData = async (tab, isBackground = false) => {
+        try {
+          // Apuntando de vuelta al servidor local en Python
+          const [resCryptos, resStocks] = await Promise.all([
+            fetch('http://127.0.0.1:8000/api/rankings/cryptos').then(r => r.json()).catch(() => []),
+            fetch('http://127.0.0.1:8000/api/rankings/stocks').then(r => r.json()).catch(() => [])
+          ]);
+          const allCombined = [...(Array.isArray(resCryptos) ? resCryptos : []), ...(Array.isArray(resStocks) ? resStocks : [])];
+
+          checkAndTriggerAlerts(allCombined);
+
+          let currentData = [];
+          if (tab === 'favorites') {
+            currentData = allCombined.filter(item => favorites.includes(item.symbol));
+            setAssets(currentData);
+          } else if (tab === 'stocks') {
+            currentData = resStocks;
+            setAssets(resStocks);
+          } else {
+            currentData = resCryptos;
+            setAssets(resCryptos);
+          }
+
+          if (currentData.length > 0) {
+            const currentSymbol = selectedSymbolRef.current;
+            const found = currentData.find(i => i.symbol === currentSymbol);
+            if (found) {
+              setSelectedAsset(found);
+            } else {
+              setSelectedAsset(currentData[0]);
+            }
+          } else {
+            setSelectedAsset(null);
+          }
+
+          setLastUpdate(new Date().toLocaleTimeString());
+        } catch (error) {
+          console.error("Error de conexión:", error);
+        } finally {
+          if (!isBackground) setInitialLoading(false);
+        }
+      };
+
+      useEffect(() => {
+        setSelectedAsset(null);
+        fetchMarketData(activeTab, false);
+      }, [activeTab]);
+
+      useEffect(() => {
+        const interval = setInterval(() => fetchMarketData(activeTab, true), 6000);
+        return () => clearInterval(interval);
+      }, [activeTab, favorites]);
+
+      const openPaperTrade = (amountUSD = 1000) => {
+        if (!selectedAsset) return;
+        if (paperBalance < amountUSD) {
+          alert(lang === 'es' ? "Saldo virtual insuficiente para abrir esta operación." : "Insufficient virtual balance.");
+          return;
+        }
+
+        const newPos = {
+          id: Date.now(),
+          symbol: selectedAsset.symbol,
+          entryPrice: selectedAsset.price,
+          amountUSD: amountUSD,
+          quantity: amountUSD / selectedAsset.price,
+          time: new Date().toLocaleTimeString()
+        };
+
+        setPaperBalance(prev => prev - amountUSD);
+        setOpenPositions(prev => [newPos, ...prev]);
+      };
+
+      const closePaperTrade = (posId) => {
+        const pos = openPositions.find(p => p.id === posId);
+        if (!pos || !selectedAsset) return;
+
+        const currentAssetData = assets.find(a => a.symbol === pos.symbol) || selectedAsset;
+        const exitPrice = currentAssetData.symbol === pos.symbol ? currentAssetData.price : pos.entryPrice;
+        const currentVal = pos.quantity * exitPrice;
+        const pnl = currentVal - pos.amountUSD;
+
+        setPaperBalance(prev => prev + currentVal);
+        setOpenPositions(prev => openPositions.filter(p => p.id !== posId));
+        setTradeHistory(prev => [{
+          ...pos,
+          exitPrice,
+          pnl: parseFloat(pnl.toFixed(2)),
+          closeTime: new Date().toLocaleTimeString()
+        }, ...prev]);
+      };
+
+      const toggleFavorite = (e, symbol) => {
+        e.stopPropagation();
+        setFavorites(prev => {
+          const updated = prev.includes(symbol)
+            ? prev.filter(s => s !== symbol)
+            : [...prev, symbol];
+          localStorage.setItem('market_favorites', JSON.stringify(updated));
+          return updated;
+        });
+      };
+
+      const getTradingViewSymbol = (symbol, tab) => {
+        if (!symbol) return "BINANCE:BTCUSDT";
+        const stockTickers = ["NVDA", "AAPL", "MSFT", "TSLA", "AMZN", "GOOGL", "META", "NFLX", "AMD", "INTC"];
+        if (tab === 'stocks' || stockTickers.includes(symbol)) {
+          return `NASDAQ:${symbol}`;
+        }
+        return `BINANCE:${symbol}USDT`;
+      };
+
+      const getSignalBadge = (score) => {
+        if (score >= 70) return { text: t.strongBuy, bg: "bg-emerald-500/20 text-emerald-400 border-emerald-500/50" };
+        if (score >= 55) return { text: t.moderateBuy, bg: "bg-emerald-500/10 text-emerald-300 border-emerald-500/30" };
+        if (score >= 45) return { text: t.hold, bg: "bg-amber-500/10 text-amber-400 border-amber-500/30" };
+        return { text: t.avoid, bg: "bg-rose-500/20 text-rose-400 border-rose-500/50" };
+      };
+
+      return (
+        <div className="flex h-screen w-screen bg-darkBg text-slate-100 flex-col relative overflow-hidden">
+          
+          {/* PANTALLA DE CARGA INICIAL (SPLASH SCREEN) */}
+          {initialLoading && (
+            <div className="fixed inset-0 z-50 bg-[#0b0e11] flex flex-col items-center justify-center space-y-4">
+              <div className="w-16 h-16 rounded-2xl bg-cyan-500 flex items-center justify-center text-3xl font-bold text-black animate-bounce shadow-xl shadow-cyan-500/20">
+                📈
+              </div>
+              <div className="flex items-center space-x-3 text-white font-bold text-xl tracking-wider">
+                <span>MARKET<span className="text-cyan-400">TRACER</span></span>
+              </div>
+              <div className="flex items-center space-x-2 text-slate-400 text-xs">
+                <div className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
+                <span>{t.scanning}</span>
+              </div>
+            </div>
+          )}
+
+          {/* FONDO OSCURO OPACO (TOUR OVERLAY) */}
+          {tourStep !== null && (
+            <div className="tour-overlay" onClick={finishTour}></div>
+          )}
+
+          {/* CUADRO EXPLICATIVO FLOTANTE DE LA GUÍA */}
+          {tourStep !== null && (
+            <div className={`fixed z-[70] p-5 bg-[#181a20] border-2 border-cyan-400 rounded-2xl max-w-sm w-full shadow-2xl space-y-3 ${t.tourSteps[tourStep].position}`}>
+              <div className="flex justify-between items-center border-b border-borderDark pb-2">
+                <h3 className="font-bold text-cyan-400 text-sm flex items-center space-x-2">
+                  <span>💡</span>
+                  <span>{t.tourSteps[tourStep].title}</span>
+                </h3>
+                <span className="text-xs font-bold text-slate-400 bg-darkBg px-2 py-0.5 rounded border border-borderDark">{tourStep + 1} / {t.tourSteps.length}</span>
+              </div>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                {t.tourSteps[tourStep].desc}
+              </p>
+              <div className="flex items-center justify-between pt-2">
+                <button 
+                  onClick={() => setTourStep(prev => Math.max(0, prev - 1))}
+                  disabled={tourStep === 0}
+                  className={`text-xs px-3 py-1.5 rounded font-semibold ${tourStep === 0 ? 'opacity-30 cursor-not-allowed text-slate-500' : 'bg-[#2b313a] hover:bg-[#363c4e] text-slate-200'}`}
+                >
+                  {t.tourPrev}
+                </button>
+                <div className="space-x-2">
+                  <button onClick={finishTour} className="text-xs text-slate-400 hover:text-white px-2 py-1">Omitir</button>
+                  {tourStep < t.tourSteps.length - 1 ? (
+                    <button 
+                      onClick={() => setTourStep(prev => prev + 1)} 
+                      className="text-xs bg-cyan-500 hover:bg-cyan-400 text-black font-bold px-4 py-1.5 rounded transition shadow"
+                    >
+                      {t.tourNext}
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={finishTour} 
+                      className="text-xs bg-emerald-500 hover:bg-emerald-400 text-white font-bold px-4 py-1.5 rounded transition shadow"
+                    >
+                      {t.tourFinish}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TOAST ALERTS OVERLAY */}
+          <div className="fixed top-14 right-4 z-40 flex flex-col space-y-2 pointer-events-none max-w-sm w-full">
+            {alerts.map(alert => (
+              <div 
+                key={alert.id}
+                className={`p-3.5 rounded-xl border shadow-2xl backdrop-blur-md pointer-events-auto transition-all duration-500 flex items-start space-x-3 ${
+                  alert.type === 'bullish' 
+                    ? 'bg-emerald-950/95 border-emerald-500/70 text-emerald-200' 
+                    : 'bg-rose-950/95 border-rose-500/70 text-rose-200'
+                }`}
+              >
+                <div className="text-xl">{alert.type === 'bullish' ? '🚀' : '⚠️'}</div>
+                <div className="flex-1 text-xs">
+                  <div className="font-bold tracking-wide">{alert.title}</div>
+                  <div className="mt-0.5 opacity-90">{alert.message}</div>
+                </div>
+                <button onClick={() => setAlerts(prev => prev.filter(a => a.id !== alert.id))} className="opacity-60 hover:opacity-100 text-sm font-bold">✕</button>
+              </div>
+            ))}
+          </div>
+
+          {/* Top Navbar */}
+          <header className={`h-12 bg-panelBg border-b border-borderDark flex items-center justify-between px-4 text-xs transition ${tourStep === 0 ? 'tour-highlight' : ''}`}>
+            <div className="flex items-center space-x-6">
+              <div className="flex items-center space-x-2 font-bold text-sm text-cyan-400">
+                <span>📈</span>
+                <span className="text-white tracking-wider">MARKET<span className="text-cyan-400">TRACER</span></span>
+              </div>
+              <nav className="flex space-x-4 text-slate-400 font-medium">
+                <button onClick={() => setActiveTab('cryptos')} className={`hover:text-white transition ${activeTab === 'cryptos' ? 'text-cyan-400 border-b-2 border-cyan-400 pb-3 mt-3' : ''}`}>{t.spotMarkets}</button>
+                <button onClick={() => setActiveTab('stocks')} className={`hover:text-white transition ${activeTab === 'stocks' ? 'text-cyan-400 border-b-2 border-cyan-400 pb-3 mt-3' : ''}`}>{t.stocks}</button>
+                <button onClick={() => setActiveTab('favorites')} className={`hover:text-white transition flex items-center space-x-1 ${activeTab === 'favorites' ? 'text-cyan-400 border-b-2 border-cyan-400 pb-3 mt-3' : ''}`}>
+                  <span>{t.favorites}</span>
+                  <span className="bg-cyan-500/20 text-cyan-400 px-1.5 py-0.5 rounded-full text-[10px]">{favorites.length}</span>
+                </button>
+              </nav>
+            </div>
+
+            <div className="text-slate-400 flex items-center space-x-3">
+              {/* Botón de Descargar App */}
+              <a 
+                href={GITHUB_RELEASES_URL} 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="hidden md:flex items-center space-x-1 bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 font-semibold px-2.5 py-1 rounded border border-emerald-500/40 transition text-[11px]"
+                title="Descargar versión de escritorio"
+              >
+                <span>{t.downloadApp}</span>
+              </a>
+
+              {/* Enlace al Portafolio */}
+              <a 
+                href={PORTFOLIO_URL} 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="hidden lg:flex items-center space-x-1 bg-cyan-950/60 hover:bg-cyan-900/80 text-cyan-300 font-semibold px-2.5 py-1 rounded border border-cyan-500/40 transition text-[11px]"
+                title="Ver Portafolio del Desarrollador"
+              >
+                <span>🚀 Dev Portfolio</span>
+              </a>
+
+              <button 
+                onClick={() => setLang(lang === 'es' ? 'en' : 'es')}
+                className="bg-[#2b313a] hover:bg-[#363c4e] text-cyan-400 font-bold px-2.5 py-1 rounded border border-borderDark transition flex items-center space-x-1"
+              >
+                <span>{lang === 'es' ? '🇬🇧 EN' : '🇪🇸 ES'}</span>
+              </button>
+
+              <div className="bg-darkBg border border-borderDark px-3 py-1 rounded flex items-center space-x-2">
+                <span className="text-slate-400">{t.virtualBalance}</span>
+                <span className="text-emerald-400 font-bold">${paperBalance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} USDT</span>
+              </div>
+
+              <button 
+                onClick={() => setSoundEnabled(!soundEnabled)} 
+                className={`px-2 py-1 rounded border text-[11px] font-semibold transition ${soundEnabled ? 'border-cyan-500/50 text-cyan-400 bg-cyan-500/10' : 'border-borderDark text-slate-500'}`}
+              >
+                {soundEnabled ? t.soundOn : t.soundOff}
+              </button>
+
+              <button 
+                onClick={() => setTourStep(0)} 
+                className="text-[11px] text-slate-400 hover:text-cyan-400 underline"
+                title="Repetir guía interactiva"
+              >
+                ❓ Ayuda
+              </button>
+
+              <span className="text-accentGreen flex items-center space-x-1">
+                <span className="w-2 h-2 rounded-full bg-accentGreen animate-pulse"></span>
+                <span>{t.online}</span>
+              </span>
+              <span>{t.sync}: {lastUpdate}</span>
+            </div>
+          </header>
+
+          <div className="flex flex-1 overflow-hidden">
+            {/* Panel Izquierdo */}
+            <aside className={`w-72 bg-panelBg border-r border-borderDark flex flex-col p-3 text-xs space-y-4 transition ${tourStep === 2 ? 'tour-highlight' : ''}`}>
+              <div>
+                <div className="text-slate-400 font-bold mb-2 flex justify-between">
+                  <span>{t.orderBook}</span>
+                  <span>{t.priceUsdt}</span>
+                </div>
+                <div className="space-y-1 font-mono text-[11px]">
+                  <div className="flex justify-between text-accentRed opacity-80"><span>353.52</span><span>12,994</span></div>
+                  <div className="flex justify-between text-accentRed opacity-80"><span>353.51</span><span>12,166</span></div>
+                  <div className="my-1 border-t border-borderDark"></div>
+                  <div className="text-base font-bold text-accentGreen my-1">
+                    ${selectedAsset ? selectedAsset.price.toLocaleString() : '0.00'}
+                  </div>
+                  <div className="my-1 border-t border-borderDark"></div>
+                  <div className="flex justify-between text-accentGreen opacity-80"><span>353.42</span><span>14,758</span></div>
+                  <div className="flex justify-between text-accentGreen opacity-80"><span>353.41</span><span>12,684</span></div>
+                </div>
+              </div>
+
+              <div className="bg-cardBg p-3 rounded-lg border border-borderDark flex flex-col space-y-3">
+                <div className="font-bold text-cyan-400 flex items-center justify-between">
+                  <span>{t.paperTrading}</span>
+                  <span className="text-[10px] text-slate-400">{t.simulator}</span>
+                </div>
+                {selectedAsset ? (
+                  <>
+                    <div className="text-[11px] text-slate-300">
+                      Asset: <b className="text-white">{selectedAsset.symbol}</b>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button onClick={() => openPaperTrade(500)} className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-2 rounded transition text-center shadow">
+                        {t.buy500}
+                      </button>
+                      <button onClick={() => openPaperTrade(1000)} className="bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-2 px-2 rounded transition text-center shadow">
+                        {t.buy1000}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-slate-500 text-center py-2">{t.selectToTrade}</div>
+                )}
+              </div>
+
+              <div className="flex-1 flex flex-col overflow-hidden">
+                <div className="font-bold text-slate-300 mb-1">{t.openPositions} ({openPositions.length})</div>
+                <div className="overflow-y-auto flex-1 space-y-2">
+                  {openPositions.length === 0 ? (
+                    <div className="text-slate-500 text-center py-4">{t.noOpenPositions}</div>
+                  ) : (
+                    openPositions.map(pos => {
+                      const currentAsset = assets.find(a => a.symbol === pos.symbol) || selectedAsset;
+                      const currentPrice = currentAsset ? currentAsset.price : pos.entryPrice;
+                      const currentVal = pos.quantity * currentPrice;
+                      const pnl = currentVal - pos.amountUSD;
+                      const pnlPercent = (pnl / pos.amountUSD) * 100;
+
+                      return (
+                        <div key={pos.id} className="bg-darkBg border border-borderDark p-2.5 rounded-lg space-y-1">
+                          <div className="flex justify-between font-bold">
+                            <span className="text-cyan-400">{pos.symbol}</span>
+                            <button onClick={() => closePaperTrade(pos.id)} className="text-[10px] bg-rose-500/20 text-rose-400 px-2 py-0.5 rounded hover:bg-rose-500/30">{t.close}</button>
+                          </div>
+                          <div className="text-[10px] text-slate-400 flex justify-between">
+                            <span>{t.entry}: ${pos.entryPrice}</span>
+                            <span>{t.current}: ${currentPrice}</span>
+                          </div>
+                          <div className={`text-xs font-bold flex justify-between ${pnl >= 0 ? 'text-accentGreen' : 'text-accentRed'}`}>
+                            <span>PnL: {pnl >= 0 ? `+$${pnl.toFixed(2)}` : `-$${Math.abs(pnl).toFixed(2)}`}</span>
+                            <span>({pnlPercent >= 0 ? `+${pnlPercent.toFixed(2)}%` : `${pnlPercent.toFixed(2)}%`})</span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </aside>
+
+            {/* Panel Central */}
+            <main className={`flex-1 flex flex-col bg-cardBg overflow-hidden transition ${tourStep === 1 ? 'tour-highlight' : ''}`}>
+              {selectedAsset ? (
+                <>
+                  <div className="bg-panelBg border-b border-borderDark p-3 flex items-center justify-between text-xs">
+                    <div className="flex items-center space-x-5">
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <button onClick={(e) => toggleFavorite(e, selectedAsset.symbol)} className="text-base focus:outline-none">
+                            {favorites.includes(selectedAsset.symbol) ? '⭐' : '☆'}
+                          </button>
+                          <h2 className="text-lg font-bold text-white">{selectedAsset.symbol} {activeTab === 'cryptos' ? '/ USDT' : ''}</h2>
+                        </div>
+                        <span className="text-xs text-slate-400">${selectedAsset.price.toLocaleString()}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[10px]">{t.change24h}</span>
+                        <span className={`font-bold ${selectedAsset.change >= 0 ? 'text-accentGreen' : 'text-accentRed'}`}>
+                          {selectedAsset.change >= 0 ? `+${selectedAsset.change}%` : `${selectedAsset.change}%`}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[10px]">{t.techScore}</span>
+                        <span className="text-cyan-400 font-bold bg-darkBg px-2 py-0.5 rounded border border-borderDark">{selectedAsset.score} / 100</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[10px]">{t.rsi}</span>
+                        <span className={`font-bold px-2 py-0.5 rounded border border-borderDark ${selectedAsset.rsi >= 70 ? 'text-accentRed border-red-800 bg-red-950' : (selectedAsset.rsi <= 30 ? 'text-accentGreen border-emerald-800 bg-emerald-950' : 'text-slate-200 bg-darkBg')}`}>
+                          {selectedAsset.rsi}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-3">
+                      <div className={`px-4 py-2 rounded-lg font-extrabold text-sm border shadow-lg flex items-center space-x-2 ${getSignalBadge(selectedAsset.score).bg}`}>
+                        <span>{getSignalBadge(selectedAsset.score).text}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex-1 w-full bg-darkBg relative">
+                    <iframe 
+                      key={selectedAsset.symbol}
+                      src={`https://s.tradingview.com/widgetembed/?symbol=${getTradingViewSymbol(selectedAsset.symbol, activeTab)}&interval=D&hidesidetoolbar=0&symboledit=1&saveimage=1&toolbarbg=1e2329&studies=["RSI@tv-basicstudies"]&theme=dark&style=1&timezone=Etc%2FUTC&studies_overrides={}&allow_symbol_change=1&details=1&hotlist=1&calendar=1&show_popup_button=true&popup_width=1000&popup_height=650&locale=${lang}`}
+                      className="w-full h-full border-0 absolute inset-0"
+                      title="Market Tracer Chart"
+                    ></iframe>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center justify-center h-full text-slate-500">
+                  {activeTab === 'favorites' ? t.noFavorites : t.selectAsset}
+                </div>
+              )}
+            </main>
+
+            {/* Panel Derecho con Firma al Pie */}
+            <aside className={`w-80 bg-panelBg border-l border-borderDark flex flex-col p-3 text-xs space-y-3 transition ${tourStep === 3 ? 'tour-highlight' : ''}`}>
+              <div className="flex-1 flex flex-col overflow-hidden">
+                <div className="font-bold text-slate-300 mb-2 flex justify-between items-center">
+                  <span>{activeTab === 'favorites' ? t.favorites : t.technicalRanking}</span>
+                  <span className="text-[10px] text-slate-500">{assets.length}</span>
+                </div>
+                <div className="overflow-y-auto flex-1 space-y-1">
+                  {assets.length === 0 && activeTab === 'favorites' ? (
+                    <div className="text-center text-slate-500 py-10 px-4">{t.noFavorites}</div>
+                  ) : (
+                    assets.map((item) => {
+                      const isFav = favorites.includes(item.symbol);
+                      return (
+                        <div 
+                          key={item.symbol}
+                          onClick={() => setSelectedAsset(item)}
+                          className={`p-2 rounded cursor-pointer transition flex items-center justify-between hover:bg-[#2b313a]/50 ${selectedAsset && selectedAsset.symbol === item.symbol ? 'bg-[#2b313a] border border-borderDark' : ''}`}
+                        >
+                          <div className="flex items-center space-x-2">
+                            <button onClick={(e) => toggleFavorite(e, item.symbol)} className="text-sm focus:outline-none hover:scale-110 transition">
+                              {isFav ? '⭐' : '☆'}
+                            </button>
+                            <div>
+                              <div className="font-bold text-white">{item.symbol}{activeTab === 'cryptos' || (!['NVDA','AAPL','MSFT','TSLA','AMZN','GOOGL','META','NFLX','AMD','INTC'].includes(item.symbol) && activeTab !== 'stocks') ? '/USDT' : ''}</div>
+                              <div className="text-slate-400 text-[10px]">Score: <span className="text-cyan-400 font-bold">{item.score}</span> | RSI: {item.rsi}</div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-semibold text-white">${item.price.toLocaleString()}</div>
+                            <div className={`text-[11px] font-bold ${item.change >= 0 ? 'text-accentGreen' : 'text-accentRed'}`}>
+                              {item.change >= 0 ? `+${item.change}%` : `${item.change}%`}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              <div className="h-36 flex flex-col border-t border-borderDark pt-2">
+                <div className="font-bold text-slate-400 mb-1">{t.closedHistory} ({tradeHistory.length})</div>
+                <div className="overflow-y-auto flex-1 space-y-1 font-mono text-[10px]">
+                  {tradeHistory.length === 0 ? (
+                    <div className="text-slate-600 text-center py-3">{t.noClosedTrades}</div>
+                  ) : (
+                    tradeHistory.map(t_item => (
+                      <div key={t_item.id} className="bg-darkBg p-1.5 rounded flex justify-between items-center">
+                        <div>
+                          <span className="font-bold text-white">{t_item.symbol}</span>
+                          <span className="text-slate-500 block">${t_item.entryPrice} ➔ ${t_item.exitPrice}</span>
+                        </div>
+                        <div className={`font-bold ${t_item.pnl >= 0 ? 'text-accentGreen' : 'text-accentRed'}`}>
+                          {t_item.pnl >= 0 ? `+$${t_item.pnl}` : `-$${Math.abs(t_item.pnl)}`}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Pie de página con tu Firma Personal */}
+              <div className="border-t border-borderDark pt-2 text-center text-[11px] text-slate-500">
+                <span>{t.developedBy} </span>
+                <a 
+                  href={PORTFOLIO_URL} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="text-cyan-400 font-semibold hover:underline"
+                >
+                  JC
+                </a>
+              </div>
+            </aside>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
