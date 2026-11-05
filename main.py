@@ -8,7 +8,6 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 import yfinance as yf
-import webview
 import math
 import ctypes
 
@@ -237,6 +236,7 @@ def apply_window_icon(title, icon_path):
         print(f"No se pudo aplicar el icono nativo: {e}")
 
 if __name__ == "__main__":
+    import webview
     server_thread = threading.Thread(target=run_fastapi, daemon=True)
     server_thread.start()
     time.sleep(1)
