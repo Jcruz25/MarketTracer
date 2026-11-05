@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Market Tracer - Pro Terminal</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -43,6 +43,17 @@
       border-radius: 8px;
       transition: all 0.3s ease-in-out;
     }
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0b0e11;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #2b313a;
+      border-radius: 3px;
+    }
   </style>
 </head>
 <body class="bg-darkBg text-slate-100 font-sans antialiased overflow-hidden select-none">
@@ -58,6 +69,13 @@
     const API_BASE = window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost" || window.location.protocol === "file:"
       ? "http://127.0.0.1:8000" 
       : "https://markettracer.onrender.com";
+
+    // Función auxiliar para detectar si la pantalla/dispositivo es móvil
+    const checkIfMobile = () => {
+      const userAgentMobile = /Mobi|Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      const smallScreen = window.innerWidth < 768;
+      return userAgentMobile || smallScreen;
+    };
 
     const translations = {
       es: {
@@ -99,6 +117,9 @@
         tourNext: "Siguiente ➔",
         tourPrev: "← Anterior",
         tourFinish: "¡Entendido!",
+        chartView: "📊 Gráfico",
+        rankingView: "📋 Ranking",
+        simulatorView: "🎮 Simulador",
         tourSteps: [
           {
             title: "1. Selector de Mercados y Favoritos",
@@ -161,6 +182,9 @@
         tourNext: "Next ➔",
         tourPrev: "← Back",
         tourFinish: "Got it!",
+        chartView: "📊 Chart",
+        rankingView: "📋 Ranking",
+        simulatorView: "🎮 Simulator",
         tourSteps: [
           {
             title: "1. Market Selector & Watchlist",
@@ -189,6 +213,10 @@
     function App() {
       const [lang, setLang] = useState('es');
       const t = translations[lang];
+
+      // Detección automática del tipo de dispositivo
+      const [isMobile, setIsMobile] = useState(checkIfMobile);
+      const [mobileTab, setMobileTab] = useState('chart'); // 'chart', 'ranking', 'simulator'
 
       const [activeTab, setActiveTab] = useState('cryptos');
       const [assets, setAssets] = useState([]);
@@ -232,6 +260,15 @@
       });
 
       const selectedSymbolRef = useRef(null);
+
+      // Escuchar cambios de tamaño de pantalla para actualizar automáticamente el modo móvil/computadora
+      useEffect(() => {
+        const handleResize = () => {
+          setIsMobile(checkIfMobile());
+        };
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+      }, []);
 
       useEffect(() => {
         selectedSymbolRef.current = selectedAsset ? selectedAsset.symbol : null;
@@ -312,7 +349,6 @@
 
       const fetchMarketData = async (tab, isBackground = false) => {
         try {
-          // Utiliza API_BASE para alternar dinámicamente entre local y nube
           const [resCryptos, resStocks] = await Promise.all([
             fetch(`${API_BASE}/api/rankings/cryptos`).then(r => r.json()).catch(() => []),
             fetch(`${API_BASE}/api/rankings/stocks`).then(r => r.json()).catch(() => [])
@@ -429,6 +465,168 @@
         return { text: t.avoid, bg: "bg-rose-500/20 text-rose-400 border-rose-500/50" };
       };
 
+      // Subcomponente reutilizable para el Panel Izquierdo (Libro de órdenes y Simulador)
+      const LeftPanelContent = () => (
+        <React.Fragment>
+          <div>
+            <div className="text-slate-400 font-bold mb-2 flex justify-between">
+              <span>{t.orderBook}</span>
+              <span>{t.priceUsdt}</span>
+            </div>
+            <div className="space-y-1 font-mono text-[11px]">
+              <div className="flex justify-between text-accentRed opacity-80"><span>353.52</span><span>12,994</span></div>
+              <div className="flex justify-between text-accentRed opacity-80"><span>353.51</span><span>12,166</span></div>
+              <div className="my-1 border-t border-borderDark"></div>
+              <div className="text-base font-bold text-accentGreen my-1">
+                ${selectedAsset ? selectedAsset.price.toLocaleString() : '0.00'}
+              </div>
+              <div className="my-1 border-t border-borderDark"></div>
+              <div className="flex justify-between text-accentGreen opacity-80"><span>353.42</span><span>14,758</span></div>
+              <div className="flex justify-between text-accentGreen opacity-80"><span>353.41</span><span>12,684</span></div>
+            </div>
+          </div>
+
+          <div className="bg-cardBg p-3 rounded-lg border border-borderDark flex flex-col space-y-3">
+            <div className="font-bold text-cyan-400 flex items-center justify-between">
+              <span>{t.paperTrading}</span>
+              <span className="text-[10px] text-slate-400">{t.simulator}</span>
+            </div>
+            {selectedAsset ? (
+              <>
+                <div className="text-[11px] text-slate-300">
+                  Asset: <b className="text-white">{selectedAsset.symbol}</b>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={() => openPaperTrade(500)} className="bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold py-2.5 px-2 rounded transition text-center shadow">
+                    {t.buy500}
+                  </button>
+                  <button onClick={() => openPaperTrade(1000)} className="bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-white font-bold py-2.5 px-2 rounded transition text-center shadow">
+                    {t.buy1000}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="text-slate-500 text-center py-2">{t.selectToTrade}</div>
+            )}
+          </div>
+
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="font-bold text-slate-300 mb-1">{t.openPositions} ({openPositions.length})</div>
+            <div className="overflow-y-auto flex-1 space-y-2">
+              {openPositions.length === 0 ? (
+                <div className="text-slate-500 text-center py-4">{t.noOpenPositions}</div>
+              ) : (
+                openPositions.map(pos => {
+                  const currentAsset = assets.find(a => a.symbol === pos.symbol) || selectedAsset;
+                  const currentPrice = currentAsset ? currentAsset.price : pos.entryPrice;
+                  const currentVal = pos.quantity * currentPrice;
+                  const pnl = currentVal - pos.amountUSD;
+                  const pnlPercent = (pnl / pos.amountUSD) * 100;
+
+                  return (
+                    <div key={pos.id} className="bg-darkBg border border-borderDark p-2.5 rounded-lg space-y-1">
+                      <div className="flex justify-between font-bold">
+                        <span className="text-cyan-400">{pos.symbol}</span>
+                        <button onClick={() => closePaperTrade(pos.id)} className="text-[10px] bg-rose-500/20 text-rose-400 px-2 py-0.5 rounded hover:bg-rose-500/30">{t.close}</button>
+                      </div>
+                      <div className="text-[10px] text-slate-400 flex justify-between">
+                        <span>{t.entry}: ${pos.entryPrice}</span>
+                        <span>{t.current}: ${currentPrice}</span>
+                      </div>
+                      <div className={`text-xs font-bold flex justify-between ${pnl >= 0 ? 'text-accentGreen' : 'text-accentRed'}`}>
+                        <span>PnL: {pnl >= 0 ? `+$${pnl.toFixed(2)}` : `-$${Math.abs(pnl).toFixed(2)}`}</span>
+                        <span>({pnlPercent >= 0 ? `+${pnlPercent.toFixed(2)}%` : `${pnlPercent.toFixed(2)}%`})</span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </React.Fragment>
+      );
+
+      // Subcomponente reutilizable para el Panel Derecho (Ranking e Historial)
+      const RightPanelContent = () => (
+        <React.Fragment>
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="font-bold text-slate-300 mb-2 flex justify-between items-center">
+              <span>{activeTab === 'favorites' ? t.favorites : t.technicalRanking}</span>
+              <span className="text-[10px] text-slate-500">{assets.length}</span>
+            </div>
+            <div className="overflow-y-auto flex-1 space-y-1">
+              {assets.length === 0 && activeTab === 'favorites' ? (
+                <div className="text-center text-slate-500 py-10 px-4">{t.noFavorites}</div>
+              ) : (
+                assets.map((item) => {
+                  const isFav = favorites.includes(item.symbol);
+                  return (
+                    <div 
+                      key={item.symbol}
+                      onClick={() => {
+                        setSelectedAsset(item);
+                        if (isMobile) setMobileTab('chart');
+                      }}
+                      className={`p-2.5 rounded cursor-pointer transition flex items-center justify-between hover:bg-[#2b313a]/50 active:bg-[#2b313a] ${selectedAsset && selectedAsset.symbol === item.symbol ? 'bg-[#2b313a] border border-borderDark' : ''}`}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <button onClick={(e) => toggleFavorite(e, item.symbol)} className="text-base focus:outline-none hover:scale-110 transition p-1">
+                          {isFav ? '⭐' : '☆'}
+                        </button>
+                        <div>
+                          <div className="font-bold text-white">{item.symbol}{activeTab === 'cryptos' || (!['NVDA','AAPL','MSFT','TSLA','AMZN','GOOGL','META','NFLX','AMD','INTC'].includes(item.symbol) && activeTab !== 'stocks') ? '/USDT' : ''}</div>
+                          <div className="text-slate-400 text-[10px]">Score: <span className="text-cyan-400 font-bold">{item.score}</span> | RSI: {item.rsi}</div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-semibold text-white">${item.price.toLocaleString()}</div>
+                        <div className={`text-[11px] font-bold ${item.change >= 0 ? 'text-accentGreen' : 'text-accentRed'}`}>
+                          {item.change >= 0 ? `+${item.change}%` : `${item.change}%`}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          <div className="h-36 flex flex-col border-t border-borderDark pt-2 shrink-0">
+            <div className="font-bold text-slate-400 mb-1">{t.closedHistory} ({tradeHistory.length})</div>
+            <div className="overflow-y-auto flex-1 space-y-1 font-mono text-[10px]">
+              {tradeHistory.length === 0 ? (
+                <div className="text-slate-600 text-center py-3">{t.noClosedTrades}</div>
+              ) : (
+                tradeHistory.map(t_item => (
+                  <div key={t_item.id} className="bg-darkBg p-1.5 rounded flex justify-between items-center">
+                    <div>
+                      <span className="font-bold text-white">{t_item.symbol}</span>
+                      <span className="text-slate-500 block">${t_item.entryPrice} ➔ ${t_item.exitPrice}</span>
+                    </div>
+                    <div className={`font-bold ${t_item.pnl >= 0 ? 'text-accentGreen' : 'text-accentRed'}`}>
+                      {t_item.pnl >= 0 ? `+$${t_item.pnl}` : `-$${Math.abs(t_item.pnl)}`}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Pie de página con tu Firma Personal */}
+          <div className="border-t border-borderDark pt-2 text-center text-[11px] text-slate-500 shrink-0">
+            <span>{t.developedBy} </span>
+            <a 
+              href={PORTFOLIO_URL} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="text-cyan-400 font-semibold hover:underline"
+            >
+              JC
+            </a>
+          </div>
+        </React.Fragment>
+      );
+
       return (
         <div className="flex h-screen w-screen bg-darkBg text-slate-100 flex-col relative overflow-hidden">
           
@@ -517,24 +715,24 @@
             ))}
           </div>
 
-          {/* Top Navbar */}
-          <header className={`h-12 bg-panelBg border-b border-borderDark flex items-center justify-between px-4 text-xs transition ${tourStep === 0 ? 'tour-highlight' : ''}`}>
-            <div className="flex items-center space-x-6">
-              <div className="flex items-center space-x-2 font-bold text-sm text-cyan-400">
+          {/* Top Navbar Optimizada (Computadora / Teléfono) */}
+          <header className={`h-12 bg-panelBg border-b border-borderDark flex items-center justify-between px-3 md:px-4 text-xs transition shrink-0 ${tourStep === 0 ? 'tour-highlight' : ''}`}>
+            <div className="flex items-center space-x-3 md:space-x-6">
+              <div className="flex items-center space-x-1.5 md:space-x-2 font-bold text-sm text-cyan-400">
                 <span>📈</span>
-                <span className="text-white tracking-wider">MARKET<span className="text-cyan-400">TRACER</span></span>
+                <span className="text-white tracking-wider text-xs md:text-sm">MARKET<span className="text-cyan-400">TRACER</span></span>
               </div>
-              <nav className="flex space-x-4 text-slate-400 font-medium">
-                <button onClick={() => setActiveTab('cryptos')} className={`hover:text-white transition ${activeTab === 'cryptos' ? 'text-cyan-400 border-b-2 border-cyan-400 pb-3 mt-3' : ''}`}>{t.spotMarkets}</button>
-                <button onClick={() => setActiveTab('stocks')} className={`hover:text-white transition ${activeTab === 'stocks' ? 'text-cyan-400 border-b-2 border-cyan-400 pb-3 mt-3' : ''}`}>{t.stocks}</button>
-                <button onClick={() => setActiveTab('favorites')} className={`hover:text-white transition flex items-center space-x-1 ${activeTab === 'favorites' ? 'text-cyan-400 border-b-2 border-cyan-400 pb-3 mt-3' : ''}`}>
+              <nav className="flex space-x-1 md:space-x-4 text-slate-400 font-medium">
+                <button onClick={() => setActiveTab('cryptos')} className={`px-2 py-1 rounded md:rounded-none md:p-0 hover:text-white transition ${activeTab === 'cryptos' ? 'text-cyan-400 md:border-b-2 md:border-cyan-400 md:pb-3 md:mt-3 font-bold bg-darkBg md:bg-transparent' : ''}`}>{t.spotMarkets}</button>
+                <button onClick={() => setActiveTab('stocks')} className={`px-2 py-1 rounded md:rounded-none md:p-0 hover:text-white transition ${activeTab === 'stocks' ? 'text-cyan-400 md:border-b-2 md:border-cyan-400 md:pb-3 md:mt-3 font-bold bg-darkBg md:bg-transparent' : ''}`}>{t.stocks}</button>
+                <button onClick={() => setActiveTab('favorites')} className={`px-2 py-1 rounded md:rounded-none md:p-0 hover:text-white transition flex items-center space-x-1 ${activeTab === 'favorites' ? 'text-cyan-400 md:border-b-2 md:border-cyan-400 md:pb-3 md:mt-3 font-bold bg-darkBg md:bg-transparent' : ''}`}>
                   <span>{t.favorites}</span>
                   <span className="bg-cyan-500/20 text-cyan-400 px-1.5 py-0.5 rounded-full text-[10px]">{favorites.length}</span>
                 </button>
               </nav>
             </div>
 
-            <div className="text-slate-400 flex items-center space-x-3">
+            <div className="text-slate-400 flex items-center space-x-2 md:space-x-3">
               {/* Botón de Descargar App */}
               <a 
                 href={GITHUB_RELEASES_URL} 
@@ -559,250 +757,201 @@
 
               <button 
                 onClick={() => setLang(lang === 'es' ? 'en' : 'es')}
-                className="bg-[#2b313a] hover:bg-[#363c4e] text-cyan-400 font-bold px-2.5 py-1 rounded border border-borderDark transition flex items-center space-x-1"
+                className="bg-[#2b313a] hover:bg-[#363c4e] text-cyan-400 font-bold px-2 py-1 md:px-2.5 rounded border border-borderDark transition text-[11px]"
               >
                 <span>{lang === 'es' ? '🇬🇧 EN' : '🇪🇸 ES'}</span>
               </button>
 
-              <div className="bg-darkBg border border-borderDark px-3 py-1 rounded flex items-center space-x-2">
-                <span className="text-slate-400">{t.virtualBalance}</span>
-                <span className="text-emerald-400 font-bold">${paperBalance.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} USDT</span>
+              <div className="bg-darkBg border border-borderDark px-2 py-1 md:px-3 rounded flex items-center space-x-1 md:space-x-2">
+                <span className="text-slate-400 hidden sm:inline">{t.virtualBalance}</span>
+                <span className="text-emerald-400 font-bold text-[11px] md:text-xs">${paperBalance.toLocaleString(undefined, {minimumFractionDigits: isMobile ? 0 : 2, maximumFractionDigits: 2})} <span className="hidden sm:inline">USDT</span></span>
               </div>
 
               <button 
                 onClick={() => setSoundEnabled(!soundEnabled)} 
-                className={`px-2 py-1 rounded border text-[11px] font-semibold transition ${soundEnabled ? 'border-cyan-500/50 text-cyan-400 bg-cyan-500/10' : 'border-borderDark text-slate-500'}`}
+                className={`hidden sm:block px-2 py-1 rounded border text-[11px] font-semibold transition ${soundEnabled ? 'border-cyan-500/50 text-cyan-400 bg-cyan-500/10' : 'border-borderDark text-slate-500'}`}
               >
                 {soundEnabled ? t.soundOn : t.soundOff}
               </button>
 
               <button 
                 onClick={() => setTourStep(0)} 
-                className="text-[11px] text-slate-400 hover:text-cyan-400 underline"
+                className="hidden sm:block text-[11px] text-slate-400 hover:text-cyan-400 underline"
                 title="Repetir guía interactiva"
               >
                 ❓ Ayuda
               </button>
 
-              <span className="text-accentGreen flex items-center space-x-1">
+              <span className="text-accentGreen hidden md:flex items-center space-x-1">
                 <span className="w-2 h-2 rounded-full bg-accentGreen animate-pulse"></span>
                 <span>{t.online}</span>
               </span>
-              <span>{t.sync}: {lastUpdate}</span>
+              <span className="hidden xl:inline">{t.sync}: {lastUpdate}</span>
             </div>
           </header>
 
-          <div className="flex flex-1 overflow-hidden">
-            {/* Panel Izquierdo */}
-            <aside className={`w-72 bg-panelBg border-r border-borderDark flex flex-col p-3 text-xs space-y-4 transition ${tourStep === 2 ? 'tour-highlight' : ''}`}>
-              <div>
-                <div className="text-slate-400 font-bold mb-2 flex justify-between">
-                  <span>{t.orderBook}</span>
-                  <span>{t.priceUsdt}</span>
-                </div>
-                <div className="space-y-1 font-mono text-[11px]">
-                  <div className="flex justify-between text-accentRed opacity-80"><span>353.52</span><span>12,994</span></div>
-                  <div className="flex justify-between text-accentRed opacity-80"><span>353.51</span><span>12,166</span></div>
-                  <div className="my-1 border-t border-borderDark"></div>
-                  <div className="text-base font-bold text-accentGreen my-1">
-                    ${selectedAsset ? selectedAsset.price.toLocaleString() : '0.00'}
-                  </div>
-                  <div className="my-1 border-t border-borderDark"></div>
-                  <div className="flex justify-between text-accentGreen opacity-80"><span>353.42</span><span>14,758</span></div>
-                  <div className="flex justify-between text-accentGreen opacity-80"><span>353.41</span><span>12,684</span></div>
-                </div>
-              </div>
+          <div className="flex flex-1 overflow-hidden relative">
+            
+            {/* VISTA PARA COMPUTADORAS (Tres columnas clásicas) */}
+            {!isMobile && (
+              <React.Fragment>
+                {/* Panel Izquierdo PC */}
+                <aside className={`w-72 bg-panelBg border-r border-borderDark flex flex-col p-3 text-xs space-y-4 shrink-0 transition ${tourStep === 2 ? 'tour-highlight' : ''}`}>
+                  <LeftPanelContent />
+                </aside>
 
-              <div className="bg-cardBg p-3 rounded-lg border border-borderDark flex flex-col space-y-3">
-                <div className="font-bold text-cyan-400 flex items-center justify-between">
-                  <span>{t.paperTrading}</span>
-                  <span className="text-[10px] text-slate-400">{t.simulator}</span>
-                </div>
-                {selectedAsset ? (
-                  <>
-                    <div className="text-[11px] text-slate-300">
-                      Asset: <b className="text-white">{selectedAsset.symbol}</b>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button onClick={() => openPaperTrade(500)} className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-2 rounded transition text-center shadow">
-                        {t.buy500}
-                      </button>
-                      <button onClick={() => openPaperTrade(1000)} className="bg-emerald-500 hover:bg-emerald-400 text-white font-bold py-2 px-2 rounded transition text-center shadow">
-                        {t.buy1000}
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-slate-500 text-center py-2">{t.selectToTrade}</div>
-                )}
-              </div>
-
-              <div className="flex-1 flex flex-col overflow-hidden">
-                <div className="font-bold text-slate-300 mb-1">{t.openPositions} ({openPositions.length})</div>
-                <div className="overflow-y-auto flex-1 space-y-2">
-                  {openPositions.length === 0 ? (
-                    <div className="text-slate-500 text-center py-4">{t.noOpenPositions}</div>
-                  ) : (
-                    openPositions.map(pos => {
-                      const currentAsset = assets.find(a => a.symbol === pos.symbol) || selectedAsset;
-                      const currentPrice = currentAsset ? currentAsset.price : pos.entryPrice;
-                      const currentVal = pos.quantity * currentPrice;
-                      const pnl = currentVal - pos.amountUSD;
-                      const pnlPercent = (pnl / pos.amountUSD) * 100;
-
-                      return (
-                        <div key={pos.id} className="bg-darkBg border border-borderDark p-2.5 rounded-lg space-y-1">
-                          <div className="flex justify-between font-bold">
-                            <span className="text-cyan-400">{pos.symbol}</span>
-                            <button onClick={() => closePaperTrade(pos.id)} className="text-[10px] bg-rose-500/20 text-rose-400 px-2 py-0.5 rounded hover:bg-rose-500/30">{t.close}</button>
+                {/* Panel Central PC */}
+                <main className={`flex-1 flex flex-col bg-cardBg overflow-hidden transition ${tourStep === 1 ? 'tour-highlight' : ''}`}>
+                  {selectedAsset ? (
+                    <>
+                      <div className="bg-panelBg border-b border-borderDark p-3 flex items-center justify-between text-xs shrink-0">
+                        <div className="flex items-center space-x-5">
+                          <div>
+                            <div className="flex items-center space-x-2">
+                              <button onClick={(e) => toggleFavorite(e, selectedAsset.symbol)} className="text-base focus:outline-none">
+                                {favorites.includes(selectedAsset.symbol) ? '⭐' : '☆'}
+                              </button>
+                              <h2 className="text-lg font-bold text-white">{selectedAsset.symbol} {activeTab === 'cryptos' ? '/ USDT' : ''}</h2>
+                            </div>
+                            <span className="text-xs text-slate-400">${selectedAsset.price.toLocaleString()}</span>
                           </div>
-                          <div className="text-[10px] text-slate-400 flex justify-between">
-                            <span>{t.entry}: ${pos.entryPrice}</span>
-                            <span>{t.current}: ${currentPrice}</span>
+                          <div>
+                            <span className="text-slate-400 block text-[10px]">{t.change24h}</span>
+                            <span className={`font-bold ${selectedAsset.change >= 0 ? 'text-accentGreen' : 'text-accentRed'}`}>
+                              {selectedAsset.change >= 0 ? `+${selectedAsset.change}%` : `${selectedAsset.change}%`}
+                            </span>
                           </div>
-                          <div className={`text-xs font-bold flex justify-between ${pnl >= 0 ? 'text-accentGreen' : 'text-accentRed'}`}>
-                            <span>PnL: {pnl >= 0 ? `+$${pnl.toFixed(2)}` : `-$${Math.abs(pnl).toFixed(2)}`}</span>
-                            <span>({pnlPercent >= 0 ? `+${pnlPercent.toFixed(2)}%` : `${pnlPercent.toFixed(2)}%`})</span>
+                          <div>
+                            <span className="text-slate-400 block text-[10px]">{t.techScore}</span>
+                            <span className="text-cyan-400 font-bold bg-darkBg px-2 py-0.5 rounded border border-borderDark">{selectedAsset.score} / 100</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block text-[10px]">{t.rsi}</span>
+                            <span className={`font-bold px-2 py-0.5 rounded border border-borderDark ${selectedAsset.rsi >= 70 ? 'text-accentRed border-red-800 bg-red-950' : (selectedAsset.rsi <= 30 ? 'text-accentGreen border-emerald-800 bg-emerald-950' : 'text-slate-200 bg-darkBg')}`}>
+                              {selectedAsset.rsi}
+                            </span>
                           </div>
                         </div>
-                      );
-                    })
+
+                        <div className="flex items-center space-x-3">
+                          <div className={`px-4 py-2 rounded-lg font-extrabold text-sm border shadow-lg flex items-center space-x-2 ${getSignalBadge(selectedAsset.score).bg}`}>
+                            <span>{getSignalBadge(selectedAsset.score).text}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex-1 w-full bg-darkBg relative">
+                        <iframe 
+                          key={selectedAsset.symbol}
+                          src={`https://s.tradingview.com/widgetembed/?symbol=${getTradingViewSymbol(selectedAsset.symbol, activeTab)}&interval=D&hidesidetoolbar=0&symboledit=1&saveimage=1&toolbarbg=1e2329&studies=["RSI@tv-basicstudies"]&theme=dark&style=1&timezone=Etc%2FUTC&studies_overrides={}&allow_symbol_change=1&details=1&hotlist=1&calendar=1&show_popup_button=true&popup_width=1000&popup_height=650&locale=${lang}`}
+                          className="w-full h-full border-0 absolute inset-0"
+                          title="Market Tracer Chart"
+                        ></iframe>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-slate-500">
+                      {activeTab === 'favorites' ? t.noFavorites : t.selectAsset}
+                    </div>
                   )}
+                </main>
+
+                {/* Panel Derecho PC */}
+                <aside className={`w-80 bg-panelBg border-l border-borderDark flex flex-col p-3 text-xs space-y-3 shrink-0 transition ${tourStep === 3 ? 'tour-highlight' : ''}`}>
+                  <RightPanelContent />
+                </aside>
+              </React.Fragment>
+            )}
+
+            {/* VISTA PARA TELÉFONOS (Pestañas móviles optimizadas táctiles) */}
+            {isMobile && (
+              <div className="flex-1 flex flex-col w-full h-full bg-cardBg overflow-hidden">
+                
+                {/* Selector de Pestañas Móviles Táctiles */}
+                <div className="flex bg-panelBg border-b border-borderDark shrink-0">
+                  <button 
+                    onClick={() => setMobileTab('chart')} 
+                    className={`flex-1 py-3 text-center font-bold text-xs transition ${mobileTab === 'chart' ? 'text-cyan-400 border-b-2 border-cyan-400 bg-darkBg' : 'text-slate-400'}`}
+                  >
+                    {t.chartView}
+                  </button>
+                  <button 
+                    onClick={() => setMobileTab('ranking')} 
+                    className={`flex-1 py-3 text-center font-bold text-xs transition ${mobileTab === 'ranking' ? 'text-cyan-400 border-b-2 border-cyan-400 bg-darkBg' : 'text-slate-400'}`}
+                  >
+                    {t.rankingView}
+                  </button>
+                  <button 
+                    onClick={() => setMobileTab('simulator')} 
+                    className={`flex-1 py-3 text-center font-bold text-xs transition ${mobileTab === 'simulator' ? 'text-cyan-400 border-b-2 border-cyan-400 bg-darkBg' : 'text-slate-400'}`}
+                  >
+                    {t.simulatorView}
+                  </button>
                 </div>
-              </div>
-            </aside>
 
-            {/* Panel Central */}
-            <main className={`flex-1 flex flex-col bg-cardBg overflow-hidden transition ${tourStep === 1 ? 'tour-highlight' : ''}`}>
-              {selectedAsset ? (
-                <>
-                  <div className="bg-panelBg border-b border-borderDark p-3 flex items-center justify-between text-xs">
-                    <div className="flex items-center space-x-5">
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <button onClick={(e) => toggleFavorite(e, selectedAsset.symbol)} className="text-base focus:outline-none">
-                            {favorites.includes(selectedAsset.symbol) ? '⭐' : '☆'}
-                          </button>
-                          <h2 className="text-lg font-bold text-white">{selectedAsset.symbol} {activeTab === 'cryptos' ? '/ USDT' : ''}</h2>
-                        </div>
-                        <span className="text-xs text-slate-400">${selectedAsset.price.toLocaleString()}</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-400 block text-[10px]">{t.change24h}</span>
-                        <span className={`font-bold ${selectedAsset.change >= 0 ? 'text-accentGreen' : 'text-accentRed'}`}>
-                          {selectedAsset.change >= 0 ? `+${selectedAsset.change}%` : `${selectedAsset.change}%`}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-slate-400 block text-[10px]">{t.techScore}</span>
-                        <span className="text-cyan-400 font-bold bg-darkBg px-2 py-0.5 rounded border border-borderDark">{selectedAsset.score} / 100</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-400 block text-[10px]">{t.rsi}</span>
-                        <span className={`font-bold px-2 py-0.5 rounded border border-borderDark ${selectedAsset.rsi >= 70 ? 'text-accentRed border-red-800 bg-red-950' : (selectedAsset.rsi <= 30 ? 'text-accentGreen border-emerald-800 bg-emerald-950' : 'text-slate-200 bg-darkBg')}`}>
-                          {selectedAsset.rsi}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center space-x-3">
-                      <div className={`px-4 py-2 rounded-lg font-extrabold text-sm border shadow-lg flex items-center space-x-2 ${getSignalBadge(selectedAsset.score).bg}`}>
-                        <span>{getSignalBadge(selectedAsset.score).text}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex-1 w-full bg-darkBg relative">
-                    <iframe 
-                      key={selectedAsset.symbol}
-                      src={`https://s.tradingview.com/widgetembed/?symbol=${getTradingViewSymbol(selectedAsset.symbol, activeTab)}&interval=D&hidesidetoolbar=0&symboledit=1&saveimage=1&toolbarbg=1e2329&studies=["RSI@tv-basicstudies"]&theme=dark&style=1&timezone=Etc%2FUTC&studies_overrides={}&allow_symbol_change=1&details=1&hotlist=1&calendar=1&show_popup_button=true&popup_width=1000&popup_height=650&locale=${lang}`}
-                      className="w-full h-full border-0 absolute inset-0"
-                      title="Market Tracer Chart"
-                    ></iframe>
-                  </div>
-                </>
-              ) : (
-                <div className="flex items-center justify-center h-full text-slate-500">
-                  {activeTab === 'favorites' ? t.noFavorites : t.selectAsset}
-                </div>
-              )}
-            </main>
-
-            {/* Panel Derecho con Firma al Pie */}
-            <aside className={`w-80 bg-panelBg border-l border-borderDark flex flex-col p-3 text-xs space-y-3 transition ${tourStep === 3 ? 'tour-highlight' : ''}`}>
-              <div className="flex-1 flex flex-col overflow-hidden">
-                <div className="font-bold text-slate-300 mb-2 flex justify-between items-center">
-                  <span>{activeTab === 'favorites' ? t.favorites : t.technicalRanking}</span>
-                  <span className="text-[10px] text-slate-500">{assets.length}</span>
-                </div>
-                <div className="overflow-y-auto flex-1 space-y-1">
-                  {assets.length === 0 && activeTab === 'favorites' ? (
-                    <div className="text-center text-slate-500 py-10 px-4">{t.noFavorites}</div>
-                  ) : (
-                    assets.map((item) => {
-                      const isFav = favorites.includes(item.symbol);
-                      return (
-                        <div 
-                          key={item.symbol}
-                          onClick={() => setSelectedAsset(item)}
-                          className={`p-2 rounded cursor-pointer transition flex items-center justify-between hover:bg-[#2b313a]/50 ${selectedAsset && selectedAsset.symbol === item.symbol ? 'bg-[#2b313a] border border-borderDark' : ''}`}
-                        >
-                          <div className="flex items-center space-x-2">
-                            <button onClick={(e) => toggleFavorite(e, item.symbol)} className="text-sm focus:outline-none hover:scale-110 transition">
-                              {isFav ? '⭐' : '☆'}
-                            </button>
+                {/* Contenido según la pestaña seleccionada en el teléfono */}
+                <div className="flex-1 flex flex-col overflow-hidden relative">
+                  
+                  {/* TAB MÓVIL 1: GRÁFICO */}
+                  {mobileTab === 'chart' && (
+                    <div className="flex-1 flex flex-col h-full overflow-hidden">
+                      {selectedAsset ? (
+                        <>
+                          <div className="bg-panelBg border-b border-borderDark p-2.5 flex items-center justify-between text-xs shrink-0">
                             <div>
-                              <div className="font-bold text-white">{item.symbol}{activeTab === 'cryptos' || (!['NVDA','AAPL','MSFT','TSLA','AMZN','GOOGL','META','NFLX','AMD','INTC'].includes(item.symbol) && activeTab !== 'stocks') ? '/USDT' : ''}</div>
-                              <div className="text-slate-400 text-[10px]">Score: <span className="text-cyan-400 font-bold">{item.score}</span> | RSI: {item.rsi}</div>
+                              <div className="flex items-center space-x-2">
+                                <button onClick={(e) => toggleFavorite(e, selectedAsset.symbol)} className="text-base focus:outline-none p-1">
+                                  {favorites.includes(selectedAsset.symbol) ? '⭐' : '☆'}
+                                </button>
+                                <h2 className="text-sm font-bold text-white">{selectedAsset.symbol}</h2>
+                              </div>
+                              <span className="text-[11px] text-slate-400">${selectedAsset.price.toLocaleString()}</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <span className={`text-[11px] font-bold ${selectedAsset.change >= 0 ? 'text-accentGreen' : 'text-accentRed'}`}>
+                                {selectedAsset.change >= 0 ? `+${selectedAsset.change}%` : `${selectedAsset.change}%`}
+                              </span>
+                              <div className={`px-2 py-1 rounded font-extrabold text-[10px] border ${getSignalBadge(selectedAsset.score).bg}`}>
+                                {getSignalBadge(selectedAsset.score).text}
+                              </div>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <div className="font-semibold text-white">${item.price.toLocaleString()}</div>
-                            <div className={`text-[11px] font-bold ${item.change >= 0 ? 'text-accentGreen' : 'text-accentRed'}`}>
-                              {item.change >= 0 ? `+${item.change}%` : `${item.change}%`}
-                            </div>
+
+                          <div className="flex-1 w-full bg-darkBg relative">
+                            <iframe 
+                              key={selectedAsset.symbol}
+                              src={`https://s.tradingview.com/widgetembed/?symbol=${getTradingViewSymbol(selectedAsset.symbol, activeTab)}&interval=D&hidesidetoolbar=1&symboledit=0&saveimage=0&toolbarbg=1e2329&studies=["RSI@tv-basicstudies"]&theme=dark&style=1&timezone=Etc%2FUTC&studies_overrides={}&allow_symbol_change=0&details=0&hotlist=0&calendar=0&locale=${lang}`}
+                              className="w-full h-full border-0 absolute inset-0"
+                              title="Market Tracer Chart Mobile"
+                            ></iframe>
                           </div>
+                        </>
+                      ) : (
+                        <div className="flex items-center justify-center h-full text-slate-500 text-xs">
+                          {activeTab === 'favorites' ? t.noFavorites : t.selectAsset}
                         </div>
-                      );
-                    })
+                      )}
+                    </div>
                   )}
+
+                  {/* TAB MÓVIL 2: RANKING Y FAVORITOS */}
+                  {mobileTab === 'ranking' && (
+                    <div className="flex-1 flex flex-col p-3 bg-panelBg overflow-hidden">
+                      <RightPanelContent />
+                    </div>
+                  )}
+
+                  {/* TAB MÓVIL 3: SIMULADOR Y LIBRO DE ÓRDENES */}
+                  {mobileTab === 'simulator' && (
+                    <div className="flex-1 flex flex-col p-3 bg-panelBg space-y-4 overflow-y-auto">
+                      <LeftPanelContent />
+                    </div>
+                  )}
+
                 </div>
               </div>
+            )}
 
-              <div className="h-36 flex flex-col border-t border-borderDark pt-2">
-                <div className="font-bold text-slate-400 mb-1">{t.closedHistory} ({tradeHistory.length})</div>
-                <div className="overflow-y-auto flex-1 space-y-1 font-mono text-[10px]">
-                  {tradeHistory.length === 0 ? (
-                    <div className="text-slate-600 text-center py-3">{t.noClosedTrades}</div>
-                  ) : (
-                    tradeHistory.map(t_item => (
-                      <div key={t_item.id} className="bg-darkBg p-1.5 rounded flex justify-between items-center">
-                        <div>
-                          <span className="font-bold text-white">{t_item.symbol}</span>
-                          <span className="text-slate-500 block">${t_item.entryPrice} ➔ ${t_item.exitPrice}</span>
-                        </div>
-                        <div className={`font-bold ${t_item.pnl >= 0 ? 'text-accentGreen' : 'text-accentRed'}`}>
-                          {t_item.pnl >= 0 ? `+$${t_item.pnl}` : `-$${Math.abs(t_item.pnl)}`}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              {/* Pie de página con tu Firma Personal */}
-              <div className="border-t border-borderDark pt-2 text-center text-[11px] text-slate-500">
-                <span>{t.developedBy} </span>
-                <a 
-                  href={PORTFOLIO_URL} 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="text-cyan-400 font-semibold hover:underline"
-                >
-                  JC
-                </a>
-              </div>
-            </aside>
           </div>
         </div>
       );
